@@ -1,0 +1,83 @@
+library(MASS)
+library(ggplot2)
+library(cluster)
+library (fpc)
+library(treeClust)
+
+#subset the original dataset
+biopsy.class <- biopsy$class
+biopsy.data <- biopsy[,2:10]
+
+#replace NAs with zeroes
+biopsy.data[is.na(biopsy.data)] <- 0
+
+#conduct PCA on original dataset and plot
+biopsy.pr <- prcomp(biopsy.data, scale. = TRUE)
+
+ggplot(as.data.frame(biopsy.pr$x), aes(x=PC1, y=PC2, color = biopsy.class)) + 
+  geom_point() + labs(title = "Principal Component Analysis", color = "Biopsy Class",
+                      x = "Principal Component 1", y = "Principal Component 2")
+
+################# KMEANS #####################
+#Determine the right number of clusters
+wss <- numeric (length (2:15))
+names (wss) <- 2:15 # vector names
+for (i in 2:15)  {
+  out <- kmeans (scale (biopsy.data), i, nstart=1000, iter.max=100)
+  wss[as.character (i)] <- out$tot.withinss
+}
+plot (2:15, wss, type = "b") # where is the knee??
+
+#Apply K-menas to the dataset
+biopsy.kmeans2 <- kmeans(scale(biopsy.data), 2, nstart = 1000, iter.max = 100)
+biopsy.kmeans3 <- kmeans(scale(biopsy.data), 3, nstart = 1000, iter.max = 100)
+biopsy.kmeans4 <- kmeans(scale(biopsy.data), 4, nstart = 1000, iter.max = 100)
+
+biopsy.kmeans$betweenss/biopsy.kmeans$totss
+
+#plot k-means results
+ggplot(as.data.frame(biopsy.pr$x), aes(x=PC1, y=PC2, color = as.factor(biopsy.kmeans2$cluster))) + 
+  geom_point() + labs(title = "Kmeans Clustering", subtitle = "k = 2", color = "Cluster Group",
+                      x = "Principal Component 1", y = "Principal Component 2") +
+  geom_vline(xintercept = -0.85, lty = "dashed") 
+
+ggplot(as.data.frame(biopsy.pr$x), aes(x=PC1, y=PC2, color = as.factor(biopsy.kmeans3$cluster))) + 
+  geom_point() + labs(title = "Kmeans Clustering", subtitle = "k = 3", color = "Cluster Group",
+                      x = "Principal Component 1", y = "Principal Component 2")
+
+ggplot(as.data.frame(biopsy.pr$x), aes(x=PC1, y=PC2, color = as.factor(biopsy.kmeans4$cluster))) + 
+  geom_point() + labs(title = "Kmeans Clustering", subtitle = "k = 4", color = "Cluster Group",
+                      x = "Principal Component 1", y = "Principal Component 2")
+
+
+
+
+###################### PAM ###################
+#Determine the number of clusters to use
+pout <- pamk (scale (biopsy.data), 2:15, stand=T) 
+plot (pout$crit, type = "b") # avg. silhouette width criterion says 2
+pout <- pamk (scale (biopsy.data), 2:15, criterion = "ch", stand=T) 
+plot (pout$crit, type = "b") # "ch" criterion says 2 also.
+
+#Apply PAM with 2-4 cluster
+biopsy.pam2 <- pam(biopsy.data, 2, diss = FALSE, stand = TRUE)
+biopsy.pam3 <- pam(biopsy.data, 3, diss = FALSE, stand = TRUE)
+biopsy.pam4 <- pam(biopsy.data, 4, diss = FALSE, stand = TRUE)
+
+plot(biopsy.pam4)
+
+
+
+################ Cramer #######################
+
+table(biopsy.pam2$clustering, biopsy.kmeans2$cluster)
+table(biopsy.pam2$clustering, biopsy.kmeans2$cluster)
+
+cramer(table(biopsy.pam4$clustering, biopsy.kmeans4$cluster))
+cramer(table(biopsy.pam3$clustering, biopsy.kmeans3$cluster))
+cramer(table(biopsy.pam2$clustering, biopsy.kmeans2$cluster))
+
+
+############## Compare ######################
+table(biopsy.class, biopsy.kmeans2$cluster)
+table(biopsy.class, biopsy.pam2$clustering)
