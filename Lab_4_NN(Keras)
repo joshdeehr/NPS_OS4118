@@ -1,0 +1,55 @@
+library(tidyverse)
+#
+# Read data in
+#
+super <- read.csv ("super.csv")    # a data.frame
+super.class <- super$critical_temp # a vector
+super <- super[,names (super) != "critical_temp"] # Remove response column
+#
+# Test/train split
+#
+set.seed (6881)
+train.ind <- sample (nrow (super), 18000, replace=FALSE)
+super.train <- as.matrix (super[train.ind,]) # no categoricals
+super.train.y <- matrix (super.class[train.ind], ncol = 1) # as matrix
+# If there had been factors we would have had to turn them into one-hot sets.
+
+super.test <- as.matrix (super[-train.ind,]) 
+super.test.y <- matrix (super.class[-train.ind], ncol = 1)
+#
+# Now scale using only the training data. 
+#
+super.train <- scale (super.train)
+super.test <- scale (super.test, 
+                     center = attributes(super.train)$'scaled:center',
+                     scale = attributes(super.train)$'scaled:scale')
+
+
+library (keras)
+
+k_backend()
+
+mod <- keras_model_sequential () # I give you this for free!
+
+# Next steps: layer_dense() one or more times, compile(), fit().
+mod %>% 
+  layer_dense(units = 50, activation = 'sigmoid', input_shape = c(81)) %>% 
+  layer_dense(units = 10, activation = 'sigmoid') %>% 
+  layer_dense(units = 1, activation = 'softmax')
+
+#, kernel_regularizer = regularizer_l1_l2(l1 = 0.01, l2 = 0.01)
+
+summary(mod)
+
+
+mod %>% 
+  compile(
+    loss = "mse",
+    optimizer = optimizer_sgd(lr = 0.01, momentum = 0.5, decay = 0.01),
+    metrics = c("mse")
+  )
+
+mod.fit <- mod %>% fit(
+  super.train, super.train.y,
+  epochs = 400, batch_size = 18000
+)
