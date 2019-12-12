@@ -1,0 +1,88 @@
+library(tm)
+library (cleanNLP)
+library(tidyverse)
+cnlp_init_udpipe ()
+#cnlp_annotate ('This is a test')
+#
+# Let's see if we have all those abstract files in the current directory.
+# That have names that start 1, then 4-8, then some stuff, ending in
+# dot, t, x, t. This looks like a job for regular expressions!
+#
+length (dir (pattern = "^1[4-8].+\\.txt")) # 181
+abs <- dir (pattern = "^1[4-8].+\\.txt") # file names
+#
+# Creating a simple corpus from all the documents is straightforward.
+#
+or.corpus1 <- VCorpus (DirSource (".", pattern = "^1[4-8].+\\.txt", mode = "text"))
+#
+# Let's annotate one document -- say, number 15
+#
+#intxt <- paste (scan (abs[15], what = "", sep="\n"), collapse= " ")
+#annot.out <- cnlp_annotate (intxt)
+
+
+i <- 0
+txt.vector <- NULL
+
+for (i in 1:length(abs)) {
+  intxt <- paste (scan (abs[i], what = "", sep="\n"), collapse= " ")
+  annot.out <- cnlp_annotate (intxt)
+  temp <- annot.out$token %>% 
+    filter(upos == "PRON" | upos == "NOUN" |upos == "VERB") %>% 
+    select(lemma) 
+  temp.2 <- paste(temp$lemma, collapse = " ")
+  txt.vector <- c(txt.vector, temp.2)
+  
+}
+
+#
+# Okay. the "token" element of the "annot.out" item lists all
+# the tokens -- words -- in the document. Your jobs are:
+# 1.) Extract just the tokens for which upos is PROPN, NOUN, or VERB.
+# 2.) Now extract just the lemmas from these tokens.
+# 3.) Convert the lemmas to lower-case...
+# 4.) and paste() them together using collapse = " " to create one long
+# document-like string with just the 'important' words.
+# 5.) If you can do that for one document, you can do it for all of them.
+# Create an empty character vector of the proper length, and insert the
+# processed abstracts into it. At the end of that operation you'll have
+# a vector of 181 character strings.
+
+# Now create the new corpus.
+or.corpus2 <- VCorpus (VectorSource (txt.vector[-90]))
+
+#the 90th abstract only contained "In October 2015"
+
+
+# Use DocumentTermMatrix from librarey tm to construct the DTM.
+dtm <- DocumentTermMatrix(or.corpus2)
+
+dim(dtm)
+
+
+library (topicmodels)
+
+lout <- LDA(dtm, k = 4, control = list (alpha = 0.1))
+lout.gamma <- as.data.frame(10^4 * lout@gamma)# which documents go with which topics?
+
+Abstract <- rownames(lout.gamma)
+lout.gamma <- cbind(Abstract, lout.gamma)
+
+#Pick which topic you want to filter by
+arrange(lout.gamma, desc(V1))
+
+dim (lout@beta) # topic strengths for each word
+#
+# Which words are strongest for each topic 
+#
+toptwenty <- sort (abs(lout@beta[1,]), decreasing=T)[1:20]
+dimnames (dtm)[[2]][which (abs (lout@beta[1,]) > min (toptwenty))]
+
+toptwenty <- sort (abs(lout@beta[2,]), decreasing=T)[1:20]
+dimnames (dtm)[[2]][which (abs (lout@beta[2,]) > min (toptwenty))]
+
+toptwenty <- sort (abs(lout@beta[3,]), decreasing=T)[1:20]
+dimnames (dtm)[[2]][which (abs (lout@beta[3,]) > min (toptwenty))]
+
+toptwenty <- sort (abs(lout@beta[4,]), decreasing=T)[1:20]
+dimnames (dtm)[[2]][which (abs (lout@beta[4,]) > min (toptwenty))]
