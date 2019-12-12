@@ -1,0 +1,65 @@
+library(tidyverse)
+library(cluster)
+library(treeClust)
+library(Rtsne)
+
+#import data w/3 parts (class, name, DNA sequence)
+splice.data <- read.fwf("splice.data.txt", widths = c(3,36,rep(1,60)))
+
+#remove observation name
+splice.data <- splice.data[,-2]
+
+#remove comma from class
+splice.data$V1 <- gsub(",","",splice.data$V1)
+
+#identify any bad DNA sequences
+bad <- apply (splice.data[,-1], 1, function (x) 
+  any (! x %in% c("A", "C", "T", "G")))
+
+#subset good and bad DNA
+splice.bad <- splice.data[bad,]
+splice.good <- splice.data[!bad,]
+
+#Create a sameple set of 1000
+splice.sample <- sample_n(splice.good, size=1000)
+
+#Split subset into data and class
+splice.test <- splice.sample[,-1]
+splice.test.class <- splice.sample[,1]
+
+#determine distances via daisy()
+daisy <- daisy(splice.test, metric = "gower")
+summary(daisy(splice.test, metric = "gower"))
+
+summary(daisy(splice.test, metric = "euclidean"))
+
+#determine distance via treeClust()
+tree <- treeClust.dist(splice.test, d.num=4)
+
+#convert to df for graphing
+daisy.scale <- as.data.frame(cmdscale(daisy,2))
+tree.scale <- as.data.frame(cmdscale(tree,2))
+
+#plot results
+ggplot(daisy.scale, aes(x=V1, y=V2, color = splice.test.class)) + 
+  geom_point() + 
+  labs(x = "Coordinate 1", y = "Coordinate 2",
+       title ="MDS of Inter-point Distances using daisy",
+       color = "DNA Class")
+
+ggplot(tree.scale, aes(x=V1, y=V2, color = splice.test.class)) + 
+  geom_point() + 
+  labs(x = "Coordinate 1", y = "Coordinate 2",
+       title ="MDS of Inter-point Distances using treeClust",
+       color = "DNA Class")
+
+#Results using Rstne
+tsne <- Rtsne(splice.test, dims = 2, initial_dims = 60, check_duplicates = FALSE)
+
+tsne.df <- as.data.frame(tsne$Y)
+
+ggplot(tsne.df, aes(x=V1, y=V2, color = splice.test.class)) + 
+  geom_point() + 
+  labs(x = "Coordinate 1", y = "Coordinate 2",
+       title ="MDS of Inter-point Distances using Rtsne",
+       color = "DNA Class")
