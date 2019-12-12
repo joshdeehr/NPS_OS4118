@@ -1,0 +1,29 @@
+library(tidyverse)
+library(spatstat)
+library(xlsx)
+
+source("write.kml.txt")
+
+#read and clean data
+data <- read.csv2("311_Cases.csv", sep = ",", quote = "\"", comment = "", stringsAsFactors = FALSE)
+sf.poly <- read.xlsx("sf.polygon.xlsx", sheetName = "sf.convert", rowIndex = (3:14))
+
+data2 <- data %>% 
+  filter(Latitude != 0)
+
+#Parking Enforcement
+pe.data <- data2 %>% 
+  filter(Category == "Parking Enforcement")
+
+pe.ppp <- ppp(x=as.numeric(pe.data$Longitude), y=as.numeric(pe.data$Latitude), 
+              owin(poly = data.frame(x=sf.poly$x, y=sf.poly$y)))
+
+plot(pe.ppp)
+
+envelope(pe.ppp, fun = Fest, nrank = 3)
+
+plot(envelope(pe.ppp, fun = Fest))
+
+
+
+write.kml(data2, "Longitude", "Latitude", "C:/Users/ktdeehr/Desktop/Josh/NPS/4118/parking.kml")
