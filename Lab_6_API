@@ -1,0 +1,44 @@
+library(httr)
+library(XML)
+library(tidyverse)
+
+link <- "https://corpslocks.usace.army.mil/lpwb/xml.tonnage"
+
+a <- sprintf("%02d", as.numeric(1:12))
+
+URLs.2018 <- paste0(link, "?in_river=MI", "&in_lock=27", "&in_mon_yr=", a, "2018")
+URLs.2019 <- paste0(link, "?in_river=MI", "&in_lock=27", "&in_mon_yr=", a[1:10], "2019")
+
+URLs <- c(URLs.2018,URLs.2019)
+
+res <- NULL
+
+for (i in 1:22) {
+  
+  x <- GET(URLs[i])
+  temp <- xmlToDataFrame (content (x, "text"))
+  res <- rbind(res,temp)
+  
+} 
+
+res$ID <- seq.int(nrow(res))
+res <- select(res, "ID", everything())
+
+
+ggplot(res, aes(x = ID)) + 
+  geom_line(aes(y = as.numeric(UPBOUND_TONS), colour = "UPBOUND_TONS")) + 
+  geom_line(aes(y = as.numeric(DOWNBOUND_TONS), colour = "DOWNBOUND_TONS")) + 
+  labs(title = "Tonnage Flow of Chain of Rocks Lock/Dam 27", y = "Tonnage", color = "Flow") + 
+  theme(legend.position = "bottom")
+
+res %>% 
+  mutate(UPBOUND_TONS = as.numeric(UPBOUND_TONS)) %>% 
+  mutate(DOWNBOUND_TONS = as.numeric(DOWNBOUND_TONS)) %>%
+  mutate_if(is.numeric, ~replace(., is.na(.), 0))  %>% 
+  select(COMM_DESC, UPBOUND_TONS, DOWNBOUND_TONS) %>% 
+  gather(Flow, Tonnage, 2:3) %>% 
+  ggplot(aes(x=COMM_DESC, y = Tonnage)) + geom_bar(aes(fill = Flow), stat = "identity", position = position_dodge()) + 
+  coord_flip() + 
+  theme(legend.position = "bottom") +
+  labs(title = "Flow of Goods by Category", x = "Description")
+
