@@ -1,0 +1,59 @@
+#load necessary libraries
+library(tidyverse)
+
+#load datasets
+vocab <- read.table("vocab.kos.txt")
+docs <- read.table("docword.kos.txt", skip = 3)
+
+#get words in necessary format for later joining
+vocab <- vocab %>% 
+  mutate(obs = 1:n()) %>% 
+  select(obs, everything())
+
+#create column names for joining
+colnames(vocab) <- c("obs", "word")
+colnames(docs) <- c("documnet", "obs", "count")
+
+#use join to identify words
+kos <- left_join(docs, vocab, by = "obs")
+
+#create 3430 x 6906 matrix  
+kos <- kos %>% 
+  select(-("obs")) %>% 
+  spread(word, count)
+
+#change NAs to 0 for PCA
+kos[is.na(kos)] <- 0
+
+#create PCA model
+PCA <- prcomp(kos[,-1])
+
+#genterate scree plot
+screeplot (PCA, npcs = length(PCA$sdev), type = "line")
+
+#determine how many components to keep
+summary <- summary(PCA)
+summary$importance[,1000:1010]
+
+#plot PC1 v PC2
+PCA.data <- data.frame(document = kos$documnet, PCA$x)
+ggplot(PCA.data, aes(PC1, PC2)) + geom_point() + theme(legend.position = 'none')
+
+#Identify top contributing words
+var_coord_func <- function(loadings, comp.sdev){
+  loadings*comp.sdev
+}
+ 
+loadings <- PCA$rotation
+sdev <- PCA$sdev
+var.coord <- t(apply(loadings, 1, var_coord_func, sdev))
+var.cos2 <- var.coord^2
+comp.cos2 <- apply(var.cos2, 2, sum)
+contrib <- function(var.cos2, comp.cos2){var.cos2*100/comp.cos2}
+var.contrib <- t(apply(var.cos2,1, contrib, comp.cos2))
+
+PC1 <- sort(abs(var.contrib[,1]), decreasing = T)
+PC1[1:10]
+
+PC2 <- sort(abs(var.contrib[,2]), decreasing = T)
+PC2[1:10]
